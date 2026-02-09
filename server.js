@@ -1,129 +1,64 @@
 const express = require("express");
-const bodyParser = require("body-parser");
-const fs = require("fs");
-const path = require("path");
-const API_KEY = process.env.API_KEY;
+const fetch = require("node-fetch");
 
 const app = express();
-const PORT = 3000;
+app.use(express.json());
 
-// static files
-app.use(express.static(__dirname));
+// Render uses environment variables
+const API_KEY = process.env.API_KEY;
 
-// Node 12 compatible body-parser
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-
-const USERS_FILE = path.join(__dirname, "data/users.json");
-
-// clear old users on first run
-fs.writeFileSync(USERS_FILE, "[]");
-
-// load/save helpers
-function loadUsers() {
-  if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, "[]");
-  return JSON.parse(fs.readFileSync(USERS_FILE));
-}
-function saveUsers(users) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+if (!API_KEY) {
+    console.error("❌ API_KEY is missing");
+    process.exit(1);
 }
 
-// signup
-app.post("/signup", (req, res) => {
-  const { username, password, gender } = req.body;
-  const users = loadUsers();
-  if (!username || !password || !gender) return res.json({ error: "Missing fields" });
-  if (users.find(u => u.username === username)) return res.json({ error: "User exists" });
+app.post("/chat", function (req, res) {
+    if (!req.body || !req.body.message) {
+        return res.json({ reply: "No message received." });
+    }
 
-  const id = Math.floor(Math.random() * 1000000);
-  users.push({ 
-    username, password, gender, id,
-    bio: "", join: new Date().toDateString(),
-    friends: [], followers: [], comments: [], posts: []
-  });
-  saveUsers(users);
-  res.json({ ok: true });
+    fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + API_KEY,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [
+                    {
+                        role: "user",
+                        parts: [{ text: req.body.message }]
+                    }
+                ]
+            })
+        }
+    )
+    .then(function (response) {
+        return response.json();
+    })
+    .then(function (data) {
+        let reply = "AI returned nothing.";
+
+        if (
+            data &&
+            data.candidates &&
+            data.candidates[0] &&
+            data.candidates[0].content &&
+            data.candidates[0].content.parts &&
+            data.candidates[0].content.parts[0]
+        ) {
+            reply = data.candidates[0].content.parts[0].text;
+        }
+
+        res.json({ reply: reply });
+    })
+    .catch(function (err) {
+        console.error("❌ Gemini fetch failed:", err);
+        res.json({ reply: "Server failed to reach AI." });
+    });
 });
 
-// login
-app.post("/login", (req, res) => {
-  const { username, password } = req.body;
-  const users = loadUsers();
-  const user = users.find(u => u.username === username && u.password === password);
-  if (!user) return res.json({ error: "Invalid login" });
-  res.json({ ok: true, user });
+// Render provides PORT automatically
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, function () {
+    console.log("✅ SimpleAI server running on port", PORT);
 });
-
-// switch accounts (same as login)
-app.post("/switch", (req, res) => {
-  const { username, password } = req.body;
-  const users = loadUsers();
-  const user = users.find(u => u.username === username && u.password === password);
-  if (!user) return res.json({ error: "Invalid login" });
-  res.json({ ok: true, user });
-});
-
-// get all users
-app.get("/users", (req, res) => {
-  const users = loadUsers();
-  res.json(users.map(u => ({ username: u.username, id: u.id })));
-});
-
-// add friend
-app.post("/addfriend", (req, res) => {
-  const { me, them } = req.body;
-  const users = loadUsers();
-  const a = users.find(u => u.username === me);
-  const b = users.find(u => u.username === them);
-  if (!a || !b) return res.json({ error: "User missing" });
-  if (a.friends.indexOf(b.username) === -1) {
-    a.friends.push(b.username);
-    b.followers.push(a.username);
-  }
-  saveUsers(users);
-  res.json({ ok: true });
-});
-
-// post (camera or placeholder)
-app.post("/post", (req, res) => {
-  const { username, image, text } = req.body;
-  const users = loadUsers();
-  const user = users.find(u => u.username === username);
-  if (!user) return res.json({ error: "No user" });
-  user.posts.push({ image: image || null, text: text || "" });
-  saveUsers(users);
-  res.json({ ok: true });
-});
-
-// edit bio
-app.post("/editbio", (req, res) => {
-  const { username, bio } = req.body;
-  const users = loadUsers();
-  const user = users.find(u => u.username === username);
-  if (!user) return res.json({ error: "No user" });
-  user.bio = bio;
-  saveUsers(users);
-  res.json({ ok: true });
-});
-
-// get profile
-app.get("/profile/:name", (req, res) => {
-  const users = loadUsers();
-  const u = users.find(x => x.username === req.params.name);
-  if (!u) return res.json({ error: "No user" });
-  res.json(u);
-});
-
-// add comment
-app.post("/comment", (req, res) => {
-  const { from, to, text } = req.body;
-  const users = loadUsers();
-  const u = users.find(x => x.username === to);
-  if (!u) return res.json({ error: "No user" });
-  u.comments.push({ from, text });
-  saveUsers(users);
-  res.json({ ok: true });
-});
-
-app.listen(PORT, "0.0.0.0", () => console.log("IFlux server running on port " + PORT));
-
