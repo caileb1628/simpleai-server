@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const fs = require("fs");
 const path = require("path");
+const API_KEY = process.env.API_KEY;
 
 const app = express();
 const PORT = 3000;
@@ -125,3 +126,4 @@ app.post("/comment", (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => console.log("IFlux server running on port " + PORT));
+
