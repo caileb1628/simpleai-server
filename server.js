@@ -12,6 +12,10 @@ if (!API_KEY) {
     process.exit(1);
 }
 
+app.get("/", function (req, res) {
+    res.send("SimpleAI server is running.");
+});
+
 app.post("/chat", function (req, res) {
     if (!req.body || !req.body.message) {
         return res.json({ reply: "No message received." });
@@ -62,3 +66,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, function () {
     console.log("✅ SimpleAI server running on port", PORT);
 });
+
