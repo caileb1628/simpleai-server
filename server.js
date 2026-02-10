@@ -1,27 +1,41 @@
+// SimpleAI server.js
 const express = require("express");
 const bodyParser = require("body-parser");
-const fetch = require("node-fetch");
-
+const fetch = require("node-fetch"); // must use node-fetch v2 if Node <18
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(bodyParser.json());
-app.use(express.static("public"));
+// --------- CORS Setup ----------
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*"); // allow all origins
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
 
-app.get("/", function (req, res) {
+// --------- Body Parser ----------
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// --------- Static Files ----------
+app.use(express.static("public")); // if you put your HTML in public/
+
+// --------- Health Check ----------
+app.get("/", function(req, res) {
     res.send("SimpleAI server is running. ✅");
 });
 
-app.post("/chat", async function (req, res) {
+// --------- POST /chat ----------
+app.post("/chat", async function(req, res) {
     try {
-        const userMessage = req.body.message;
+        var userMessage = req.body.message;
 
         if (!userMessage) {
             return res.json({ reply: "No message received." });
         }
 
-        const response = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBsncBwKqjkOxQ2OteTzF1Vy4FXFbPOtPk",
+        // Call Gemini API
+        var response = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDzKIMHQssCV4CpPZCJMITfWcm_PUI1mx4",
             {
                 method: "POST",
                 headers: {
@@ -37,10 +51,10 @@ app.post("/chat", async function (req, res) {
             }
         );
 
-        const data = await response.json();
+        var data = await response.json();
 
-        let reply = "No response.";
-
+        // Safely extract AI reply
+        var reply = "No response.";
         if (
             data &&
             data.candidates &&
@@ -60,6 +74,8 @@ app.post("/chat", async function (req, res) {
     }
 });
 
-app.listen(PORT, function () {
+// --------- Start Server ----------
+app.listen(PORT, function() {
     console.log("SimpleAI server running on port " + PORT);
+    console.log("==> Your service is live 🎉");
 });
