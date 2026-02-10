@@ -1,46 +1,45 @@
 const express = require("express");
+const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
 
 const app = express();
-app.use(express.json());
+const PORT = process.env.PORT || 10000;
 
-// Render uses environment variables
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-    console.error("❌ API_KEY is missing");
-    process.exit(1);
-}
+app.use(bodyParser.json());
+app.use(express.static("public"));
 
 app.get("/", function (req, res) {
-    res.send("SimpleAI server is running.");
+    res.send("SimpleAI server is running. ✅");
 });
 
-app.post("/chat", function (req, res) {
-    if (!req.body || !req.body.message) {
-        return res.json({ reply: "No message received." });
-    }
+app.post("/chat", async function (req, res) {
+    try {
+        const userMessage = req.body.message;
 
-    fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + API_KEY,
-        {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [
-                    {
-                        role: "user",
-                        parts: [{ text: req.body.message }]
-                    }
-                ]
-            })
+        if (!userMessage) {
+            return res.json({ reply: "No message received." });
         }
-    )
-    .then(function (response) {
-        return response.json();
-    })
-    .then(function (data) {
-        let reply = "AI returned nothing.";
+
+        const response = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyBsncBwKqjkOxQ2OteTzF1Vy4FXFbPOtPk",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    contents: [
+                        {
+                            parts: [{ text: userMessage }]
+                        }
+                    ]
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        let reply = "No response.";
 
         if (
             data &&
@@ -54,16 +53,13 @@ app.post("/chat", function (req, res) {
         }
 
         res.json({ reply: reply });
-    })
-    .catch(function (err) {
-        console.error("❌ Gemini fetch failed:", err);
-        res.json({ reply: "Server failed to reach AI." });
-    });
+
+    } catch (err) {
+        console.error(err);
+        res.json({ reply: "AI crashed like iOS beta." });
+    }
 });
 
-// Render provides PORT automatically
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, function () {
-    console.log("✅ SimpleAI server running on port", PORT);
+    console.log("SimpleAI server running on port " + PORT);
 });
-
